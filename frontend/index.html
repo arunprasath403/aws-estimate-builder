@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWS Estimate Builder</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #16191f; --muted: #5f6b7a; --border: #d5dbe1; --soft: #eef1f4;
+    --accent: #ff9900; --accent-ink: #16191f; --link: #0972d3; --warn-bg: #fff4e5; --warn: #b25b00;
+    --err-bg: #fdecec; --err: #c0262d; --ok: #1d8102; --off: #8d99a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f141a; --panel: #18202a; --text: #e9edf2; --muted: #9aa7b6; --border: #2e3a48; --soft: #202a36;
+      --accent: #ff9900; --accent-ink: #16191f; --link: #5fb0ff; --warn-bg: #3a2a12; --warn: #ffb35c;
+      --err-bg: #3d1a1c; --err: #ff8a8f; --ok: #6fd36b; --off: #6b7785;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  .drop { display: block; border: 2px dashed var(--border); border-radius: 10px; padding: 28px; text-align: center; cursor: pointer; }
+  .drop.over { border-color: var(--accent); }
+  .drop strong { display: block; font-size: 16px; margin-bottom: 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  button { font: inherit; border-radius: 8px; padding: 8px 14px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.small { padding: 3px 9px; font-size: 13px; }
+  button.link { border: none; background: none; color: var(--link); padding: 0; font-size: 13px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; }
+  .status { margin-top: 12px; min-height: 22px; }
+  .error { background: var(--err-bg); color: var(--err); padding: 10px 12px; border-radius: 8px; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .item { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
+  .item.off { border-style: dashed; }
+  .item-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .item-head .name { font-weight: 600; font-size: 16px; }
+  .item-head .svc { color: var(--muted); font-size: 13px; flex: 1; min-width: 180px; }
+  .item-head .cost { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .src { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 14px; margin-top: 12px; }
+  .f { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .f.wide { grid-column: 1 / -1; }
+  .f .lbl { display: flex; gap: 6px; justify-content: space-between; align-items: baseline; }
+  .f input, .f select, .svc-pick { width: 100%; font: inherit; font-size: 14px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); min-width: 0; }
+  .f .pair { display: flex; gap: 6px; }
+  .f .pair input { flex: 1; } .f .pair select { width: auto; max-width: 55%; }
+  .f.q { color: var(--warn); }
+  .f.q input, .f.q select { border-color: var(--warn); background: var(--warn-bg); }
+  .qbox { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); font-size: 13px; }
+  table.rows { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.rows th { text-align: left; font-weight: 600; color: var(--muted); padding: 2px 4px; }
+  table.rows td { padding: 2px 4px; }
+  table.rows input { padding: 5px 6px; font-size: 13px; }
+  details.more { margin-top: 10px; font-size: 13px; }
+  details.more summary { cursor: pointer; color: var(--link); }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .b-ok { color: var(--ok); border: 1px solid var(--ok); }
+  .b-need { color: var(--warn); border: 1px solid var(--warn); }
+  .b-off { color: var(--off); border: 1px solid var(--off); }
+  .msg { font-size: 12px; margin-top: 6px; }
+  .msg.err { color: var(--err); } .msg.warn { color: var(--warn); }
+  .calc { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .total { font-size: 20px; font-weight: 700; }
+  .result a { color: var(--link); word-break: break-all; font-weight: 600; }
+  input[type=text].name-in { padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; background: var(--panel); color: var(--text); min-width: 240px; }
+  .sticky { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--border); margin: 16px -20px -20px; padding: 14px 20px; border-radius: 0 0 10px 10px; }
+  .hidden { display: none; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>AWS Estimate Builder</h1>
+  <p class="sub">Upload a sizing sheet or project document. AI maps it to the AWS Pricing Calculator's services, asks about anything missing, and gives you a shareable calculator link priced by AWS.</p>
+
+  <section class="panel">
+    <label class="drop" id="drop">
+      <strong>Drop a file here or click to choose</strong>
+      <span class="muted">Excel (.xlsx), CSV, Word (.docx), PDF or text, up to 4 MB</span>
+      <input type="file" id="file" accept=".xlsx,.xlsm,.csv,.docx,.pdf,.txt,.md" hidden>
+    </label>
+    <div class="status" id="status"></div>
+  </section>
+
+  <section class="panel hidden" id="review">
+    <div class="row" style="margin-bottom:12px">
+      <div class="grow">
+        <strong>Review</strong>
+        <div class="muted">Orange fields were not in your file: fill them in or choose “Use default”. Everything else can be edited too.</div>
+      </div>
+      <div class="total" id="total"></div>
+    </div>
+    <div id="items"></div>
+    <button class="small" id="addItem">+ Add a service</button>
+    <div class="sticky">
+      <div class="row">
+        <input type="text" class="name-in" id="estName" placeholder="Estimate name" maxlength="100">
+        <button id="price">Calculate prices</button>
+        <button class="primary" id="generate">Generate calculator link</button>
+        <span class="muted" id="blockers"></span>
+      </div>
+      <div class="status" id="status2"></div>
+    </div>
+  </section>
+
+  <section class="panel hidden result" id="result"></section>
+
+  <datalist id="serviceList"></datalist>
+  <footer>
+    Covers the AWS Pricing Calculator's 400+ services. Prices are calculated by the AWS Pricing Calculator itself (On-Demand unless you choose otherwise).
+    Estimates are saved on AWS public servers: anyone with the link can view them.
+  </footer>
+</main>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

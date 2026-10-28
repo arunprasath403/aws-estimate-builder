@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+renderer/node_modules/
+
+# Build output
+dist/
+
+# Raw AWS Pricing Calculator definitions (re-download with catalog/fetch_definitions.py)
+catalog/raw/
+
+# Local / editor
+.claude/
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db

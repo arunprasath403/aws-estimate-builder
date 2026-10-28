@@ -1,0 +1,4 @@
+-r backend/requirements.txt
+boto3>=1.35
+pytest>=8.0
+cfn-lint>=1.0

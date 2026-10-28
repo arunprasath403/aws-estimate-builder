@@ -1,0 +1,29 @@
+{
+  "name": "Renderer test",
+  "services": {
+    "amazonApiGateway-11111111-1111-4111-8111-111111111111": {
+      "calculationComponents": {
+        "APIOpsMult": {"value": "1000000"},
+        "numberOfAPIRequests": {"value": "10", "unit": "perMonth"},
+        "dataPerRequest": {"value": "10", "unit": "kb|NA"}
+      },
+      "serviceCode": "amazonApiGateway", "region": "ap-south-1", "estimateFor": "template", "version": "0.0.59",
+      "description": "Public API", "serviceCost": {"monthly": 0, "upfront": 0},
+      "serviceName": "Amazon API Gateway", "regionName": "Asia Pacific (Mumbai)", "configSummary": ""
+    },
+    "amazonRDSPostgreSQLDB-22222222-2222-4222-8222-222222222222": {
+      "calculationComponents": {
+        "createRDSProxy": {"value": "0"}, "DatabaseInsightsSelected": {"value": "0"}, "addRDSExtendedSupport": {"value": "0"},
+        "storageAmount": {"value": "50", "unit": "gb|NA"}, "storageVolume": {"value": "General Purpose"},
+        "columnFormIPM": {"value": [{"Number of Nodes": {"value": "1"}, "Instance Type": {"value": "db.t4g.medium"},
+          "undefined": {"value": {"unit": "100", "selectedId": "%Utilized/Month"}},
+          "Deployment Option": {"value": "Multi-AZ"}, "TermType": {"value": "OnDemand"}}]}
+      },
+      "serviceCode": "amazonRDSPostgreSQLDB", "region": "ap-south-1", "estimateFor": "rdsForPostgreSQL", "version": "0.0.111",
+      "description": "Primary DB", "serviceCost": {"monthly": 0, "upfront": 0},
+      "serviceName": "Amazon RDS for PostgreSQL", "regionName": "Asia Pacific (Mumbai)", "configSummary": ""
+    }
+  },
+  "groups": {}, "groupSubtotal": {"monthly": 0, "upfront": 0}, "totalCost": {"monthly": 0, "upfront": 0},
+  "support": {}, "metaData": {"locale": "en_US", "currency": "USD", "createdOn": "2026-10-28T05:00:00.000Z", "source": "calculator-platform"}
+}

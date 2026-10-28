@@ -1,0 +1,9 @@
+Project Phoenix - Infrastructure sizing (Region: Mumbai)
+Component,Spec,Count,OS,Storage,Usage
+Web server,T4G Nano,2,Ubuntu 22.04,30 GB gp3,24x7
+App server,m6i.large,3,Windows Server 2022,100 GB,8 hrs/day weekdays
+Primary database,PostgreSQL db.t4g.medium Multi-AZ,1,,50 GB,24x7
+Reporting DB,MySQL r6g.large,1,,200 GB,
+Static assets,S3 bucket,1,,500 GB,"~2M GET, 50k PUT per month"
+Load balancer,Application Load Balancer,1,,,24x7
+Batch worker,small server 2 vCPU 4 GB,1,Linux,20 GB,24x7

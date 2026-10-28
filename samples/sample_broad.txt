@@ -1,0 +1,34 @@
+Project Nimbus - target AWS architecture (region: Singapore, all services On-Demand)
+
+Compute
+- 4 x m6i.xlarge Linux application servers, 24x7, 100 GB gp3 each
+- ECS on Fargate: 6 tasks, 1 vCPU and 2 GB memory each, running 24x7, Linux x86
+- EKS: 1 cluster
+- AWS Lambda: 20 million requests per month, 200 ms average duration, 512 MB memory, arm64
+
+Networking
+- Application Load Balancer x1, 10 new connections per second, 200 GB processed per month
+- Network Load Balancer x1, 24x7, 500 GB processed per month
+- 2 NAT Gateways, 300 GB data processed per month each
+- Amazon CloudFront: 5 TB data transfer out to Asia Pacific per month, 50 million HTTPS requests
+- Route 53: 3 hosted zones, 10 million standard queries per month
+- AWS Site-to-Site VPN: 2 connections, 24x7
+- AWS Transit Gateway: 3 VPC attachments, 1 TB data processed per month
+
+Data
+- Aurora PostgreSQL: 2 x db.r6g.large instances, 200 GB storage
+- RDS for MySQL db.m6g.large Multi-AZ, 500 GB gp2 storage
+- DynamoDB on-demand: 100 GB, 50M writes and 200M reads per month
+- ElastiCache Redis: 3 x cache.r6g.large nodes
+- Amazon OpenSearch Service: 3 x r6g.large.search data nodes, 500 GB EBS gp3 per node
+- Amazon S3 Standard: 10 TB, 5M PUT and 50M GET requests per month
+- Amazon EFS Standard: 1 TB
+- AWS Backup: 2 TB of EBS snapshots backed up
+
+Integration & ops
+- Amazon SQS: 100 million standard requests per month
+- Amazon SNS: 10 million publish requests per month
+- Amazon CloudWatch: 200 custom metrics, 100 GB logs ingested per month, 20 alarms
+- AWS WAF: 1 web ACL, 10 rules, 100 million requests per month
+- AWS Secrets Manager: 50 secrets
+- AWS KMS: 10 customer managed keys, 5 million requests per month

@@ -1,0 +1,11 @@
+{
+  "name": "calculator-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "dependencies": {
+    "@sparticuz/chromium": "138.0.2",
+    "puppeteer-core": "24.15.0"
+  }
+}

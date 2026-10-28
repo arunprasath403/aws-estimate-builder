@@ -1,0 +1,15 @@
+Project Atlas - AWS sizing (all resources in Mumbai)
+Component,Specification,Qty,Usage / volume
+Web servers,T4G Nano Ubuntu 30 GB gp3,2,24x7
+Application Load Balancer,ALB in front of web tier,1,"24x7, ~5 new connections/sec"
+NAT Gateway,1 per AZ,2,"24x7, 100 GB processed per month"
+API layer,API Gateway HTTP API,1,"10 million requests per month, 5 KB avg"
+Functions,AWS Lambda x86 1024 MB,1,"5 million invocations/month, 300 ms average"
+Cache,ElastiCache Redis cache.t4g.small,2,24x7
+Database,DynamoDB on-demand,1,"50 GB stored, 20M writes and 100M reads per month"
+Primary DB,RDS PostgreSQL db.t4g.medium Multi-AZ 50 GB,1,24x7
+Static assets,S3 Standard,1,"500 GB, 2M GET and 50k PUT per month"
+CDN,CloudFront,1,"2 TB data out per month to India, 20M HTTPS requests"
+Monitoring,CloudWatch,1,"50 custom metrics, 20 GB logs ingested per month"
+DNS,Route 53,1,"2 hosted zones, 5M queries per month"
+Secrets,Secrets Manager,1,10 secrets
