@@ -20,3 +20,6 @@ catalog/raw/
 *.log
 .DS_Store
 Thumbs.db
+
+# pipeline_test.py output
+dist_extract.json

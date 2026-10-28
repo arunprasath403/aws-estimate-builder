@@ -12,6 +12,7 @@ import time
 import uuid
 
 import boto3
+from botocore.config import Config
 
 import ai
 import catalog
@@ -23,7 +24,10 @@ JOBS_BUCKET = os.environ.get("JOBS_BUCKET")
 RENDERER_FUNCTION = os.environ.get("RENDERER_FUNCTION")
 RENDERER_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "renderer")
 _s3 = boto3.client("s3") if JOBS_BUCKET else None
-_lambda = boto3.client("lambda") if RENDERER_FUNCTION else None
+# Pricing large estimates can take minutes: wait for the renderer (300 s timeout) and never retry, since a
+# retried invoke would start a second, parallel render.
+_lambda = (boto3.client("lambda", config=Config(read_timeout=310, retries={"total_max_attempts": 1}))
+           if RENDERER_FUNCTION else None)
 _memory: dict[str, dict] = {}
 
 
@@ -72,12 +76,13 @@ class UserError(Exception):
 def _extract(req) -> dict:
     data = base64.b64decode(req["content_b64"])
     text = to_text(req["filename"], data)
-    default_region, items = ai.identify(text)
+    default_region, items, not_priced = ai.identify(text)
     for i, it in enumerate(items):
         it["id"] = f"i{i + 1}"
         it["region"] = it["region"] or default_region
     ai.fill_all(items)
-    return {"items": [forms.normalize(it) for it in items], "default_region": default_region}
+    return {"items": [forms.normalize(it) for it in items], "default_region": default_region,
+            "not_priced": not_priced}
 
 
 def _price(req, save: bool) -> dict:

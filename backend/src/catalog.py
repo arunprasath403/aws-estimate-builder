@@ -24,8 +24,20 @@ EC2_TEMPLATE = {
     ],
 }
 UNSUPPORTED = {"windowsWorkloads"}
-ROW_KEYS = {"Number of Nodes", "Instance Type", "undefined", "TermType", "Deployment Option",
-            "LeaseContractLength", "PurchaseOption"}
+
+
+def row_columns(f: dict) -> list[dict]:
+    """Instance-table columns we fill. Family columns are looked up from the instance type by the calculator,
+    so they are left out (a wrong guess prices the row at $0)."""
+    return [c for c in f.get("columns") or [] if not c.get("derived")]
+
+
+def _column_text(c: dict) -> str:
+    if c.get("type") == "utilization":
+        return "utilization (% of the month, e.g. 100)"  # forms.py maps this name to the column's real key
+    notes = ["count" if c.get("count") else None, f"e.g. {c['default']}" if c.get("default") not in (None, "", 0) else None]
+    notes = [n for n in notes if n]
+    return c["key"] + (f" ({', '.join(notes)})" if notes else "")
 
 
 @lru_cache(maxsize=1)
@@ -53,8 +65,21 @@ def _key(text: str) -> str:
 def _by_key() -> dict:
     out = {}
     for s in selectable():
-        for text in (s["code"], display_name(s), s["name"]):
+        names = [display_name(s), s["name"]]
+        if s["code"].lower().endswith("backup"):
+            # AWS Backup's parts are named just "EBS", "S3", "RDS": index them as "EBS Backup" so they do not
+            # take "Amazon EBS" from the service itself.
+            names = [n if "backup" in n.lower() else n + " Backup" for n in names]
+        for text in [s["code"], *names]:
             out.setdefault(_key(text), s["code"])
+    # Abbreviations in names ("... Apache Kafka (MSK)") so "Amazon MSK" resolves; skip ones several services share.
+    abbr = {}
+    for s in selectable():
+        for a in set(re.findall(r"\(([A-Za-z0-9 ]{2,12})\)", display_name(s) + " " + s["name"])):
+            abbr.setdefault(_key(a), set()).add(s["code"])
+    for k, codes in abbr.items():
+        if len(codes) == 1:
+            out.setdefault(k, codes.pop())
     return out
 
 
@@ -147,8 +172,7 @@ def schema_text(s: dict) -> str:
                 parts.append("units: " + ", ".join(f"{u} ({labels[u]})" if labels.get(u) and labels[u] != u else u
                                                     for u in f["units"]))
             if f.get("columns"):
-                keys = [c["key"] for c in f["columns"] if c["key"] in ROW_KEYS]
-                parts.append("row columns: " + ", ".join(k if k != "undefined" else "utilization" for k in keys))
+                parts.append("row columns: " + "; ".join(_column_text(c) for c in row_columns(f)))
             if f.get("types"):
                 parts.append("types: " + ", ".join(f["types"]))
             if "default" in f:

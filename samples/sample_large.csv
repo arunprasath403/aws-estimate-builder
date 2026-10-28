@@ -1,0 +1,92 @@
+Environment,Tier,Component,AWS Service,Configuration,Quantity,Region,Usage / Notes
+Production,Web,Web servers,Amazon EC2,m7g.large Linux On-Demand,4,us-east-1,Always on; 50 GB gp3 root volume each
+Production,Web,Bastion host,Amazon EC2,t4g.nano Linux,1,us-east-1,Always on; 8 GB gp3
+Production,App,App servers,Amazon EC2,c7g.xlarge Linux 1-year Compute Savings Plan no upfront,6,us-east-1,Always on; 100 GB gp3 each
+Production,App,Batch workers,Amazon EC2,r6i.2xlarge Linux On-Demand,2,us-east-1,Run 8 hours a day on weekdays (176 hours per month)
+Production,App,Windows reporting server,Amazon EC2,m6i.xlarge Windows Server,1,us-east-1,Always on; 200 GB gp3
+Production,Web,Load balancer,Elastic Load Balancing,Application Load Balancer,2,us-east-1,Average 25 new connections/sec; 2 GB processed per hour
+Production,Network,Internal NLB,Elastic Load Balancing,Network Load Balancer,1,us-east-1,500 GB processed per month
+Production,Network,NAT gateways,Amazon VPC,NAT Gateway,3,us-east-1,One per AZ; 1.5 TB data processed per month in total
+Production,Network,Site-to-site VPN,AWS Site-to-Site VPN,VPN connection,2,us-east-1,Always on
+Production,Network,Transit Gateway,AWS Transit Gateway,Transit Gateway attachments,4,us-east-1,800 GB data processed per month
+Production,Network,Public DNS,Amazon Route 53,Hosted zones and queries,5,us-east-1,5 hosted zones; 50 million standard queries per month
+Production,Edge,CDN,Amazon CloudFront,Web distribution,1,Global,8 TB data transfer out to internet; 120 million HTTPS requests per month
+Production,Edge,Web firewall,AWS WAF,Web ACL,1,us-east-1,10 rules; 120 million requests per month
+Production,Edge,DDoS protection,AWS Shield,Shield Standard,1,Global,Included at no cost
+Production,Data,Primary database,Amazon RDS for PostgreSQL,db.r6g.xlarge Multi-AZ,1,us-east-1,500 GB gp3 storage; 7-day backup retention
+Production,Data,Read replica,Amazon RDS for PostgreSQL,db.r6g.large Single-AZ,2,us-east-1,500 GB gp3 storage each
+Production,Data,Legacy MySQL,Amazon RDS for MySQL,db.t4g.medium Single-AZ,1,us-east-1,100 GB gp2 storage
+Production,Data,Aurora cluster,Amazon Aurora MySQL-Compatible,db.r7g.large,2,us-east-1,1 writer + 1 reader; 300 GB storage; 200 million I/O per month
+Production,Data,Serverless analytics DB,Amazon Aurora PostgreSQL Serverless v2,Aurora capacity units,1,us-east-1,Average 4 ACUs always on; 150 GB storage
+Production,Data,Session cache,Amazon ElastiCache for Redis,cache.r7g.large,3,us-east-1,Always on; 1 primary + 2 replicas
+Production,Data,Memcached cache,Amazon ElastiCache for Memcached,cache.t4g.medium,2,us-east-1,Always on
+Production,Data,Key-value store,Amazon DynamoDB,On-demand capacity,1,us-east-1,200 GB storage; 300 million writes and 900 million reads per month
+Production,Data,Document DB,Amazon DocumentDB,db.r6g.large,3,us-east-1,1 primary + 2 replicas; 250 GB storage
+Production,Data,Search cluster,Amazon OpenSearch Service,r6g.large.search,3,us-east-1,Always on; 500 GB gp3 per node
+Production,Data,Graph database,Amazon Neptune,db.r6g.large,1,us-east-1,Always on; 100 GB storage
+Production,Data,Time series,Amazon Timestream,Memory and magnetic store,1,us-east-1,
+Production,Storage,Static assets,Amazon S3,S3 Standard,1,us-east-1,5 TB stored; 20 million GET and 2 million PUT requests per month
+Production,Storage,Infrequent archive,Amazon S3,S3 Standard-Infrequent Access,1,us-east-1,20 TB stored
+Production,Storage,Long-term archive,Amazon S3 Glacier Deep Archive,Deep Archive storage,1,us-east-1,100 TB stored
+Production,Storage,Shared file system,Amazon EFS,Standard storage,1,us-east-1,2 TB stored
+Production,Storage,Windows file share,Amazon FSx for Windows File Server,Multi-AZ SSD,1,us-east-1,1 TB storage; 64 MB/s throughput
+Production,Storage,Block snapshots,Amazon EBS,EBS snapshots,1,us-east-1,3 TB of snapshot data
+Production,Storage,Backups,AWS Backup,Backup storage,1,us-east-1,10 TB warm backup storage
+Production,Containers,EKS cluster,Amazon EKS,Cluster control plane,2,us-east-1,Always on
+Production,Containers,Fargate services,AWS Fargate,ECS on Fargate Linux ARM,10,us-east-1,10 tasks always on; 1 vCPU and 2 GB memory each
+Production,Containers,Image registry,Amazon ECR,Private repository,1,us-east-1,150 GB stored
+Production,Serverless,API functions,AWS Lambda,ARM 512 MB,1,us-east-1,40 million requests per month; 200 ms average duration
+Production,Serverless,Image processing,AWS Lambda,x86 2048 MB,1,us-east-1,3 million requests per month; 3 seconds average duration
+Production,Serverless,REST API,Amazon API Gateway,REST API,1,us-east-1,40 million requests per month
+Production,Serverless,HTTP API,Amazon API Gateway,HTTP API,1,us-east-1,100 million requests per month
+Production,Serverless,Workflows,AWS Step Functions,Standard workflows,1,us-east-1,2 million state transitions per month
+Production,Integration,Order queue,Amazon SQS,Standard queue,1,us-east-1,150 million requests per month
+Production,Integration,Notifications,Amazon SNS,Standard topics,1,us-east-1,20 million publishes; 5 million email/HTTP deliveries per month
+Production,Integration,Event bus,Amazon EventBridge,Custom events,1,us-east-1,30 million custom events per month
+Production,Integration,Streaming,Amazon Kinesis Data Streams,On-demand mode,1,us-east-1,2 TB ingested per month
+Production,Integration,Kafka cluster,Amazon MSK,kafka.m7g.large,3,us-east-1,Always on; 1 TB storage per broker
+Production,Integration,Message broker,Amazon MQ,mq.m5.large RabbitMQ single-instance,1,us-east-1,Always on; 20 GB storage
+Production,Analytics,Data warehouse,Amazon Redshift,ra3.xlplus,2,us-east-1,Always on; 2 TB managed storage
+Production,Analytics,Ad-hoc queries,Amazon Athena,SQL queries,1,us-east-1,10 TB scanned per month
+Production,Analytics,ETL jobs,AWS Glue,Spark ETL jobs,1,us-east-1,10 DPUs for 3 hours a day
+Production,Analytics,Firehose delivery,Amazon Data Firehose,Direct PUT to S3,1,us-east-1,3 TB ingested per month
+Production,Analytics,Dashboards,Amazon QuickSight,Enterprise edition,1,us-east-1,10 authors and 100 readers
+Production,AI/ML,Model hosting,Amazon SageMaker AI,ml.g5.xlarge real-time endpoint,2,us-east-1,Always on
+Production,AI/ML,Model training,Amazon SageMaker AI,ml.p3.2xlarge training,1,us-east-1,40 hours per month
+Production,AI/ML,Document OCR,Amazon Textract,Detect document text,1,us-east-1,500000 pages per month
+Production,AI/ML,Image analysis,Amazon Rekognition,Image label detection,1,us-east-1,1 million images per month
+Production,AI/ML,Translation,Amazon Translate,Standard real-time,1,us-east-1,50 million characters per month
+Production,AI/ML,Speech to text,Amazon Transcribe,Standard batch,1,us-east-1,20000 minutes per month
+Production,AI/ML,Text to speech,Amazon Polly,Neural voices,1,us-east-1,10 million characters per month
+Production,AI/ML,Text analysis,Amazon Comprehend,Entity recognition,1,us-east-1,
+Production,Security,Key management,AWS Key Management Service,Customer managed keys,20,us-east-1,5 million API requests per month
+Production,Security,Secrets,AWS Secrets Manager,Secrets,50,us-east-1,2 million API calls per month
+Production,Security,Threat detection,Amazon GuardDuty,Account protection,1,us-east-1,
+Production,Security,Certificates,AWS Certificate Manager,Public certificates,10,us-east-1,Free public certificates
+Production,Security,User sign-in,Amazon Cognito,User pools,1,us-east-1,150000 monthly active users
+Production,Monitoring,Logs and metrics,Amazon CloudWatch,Logs metrics alarms and dashboards,1,us-east-1,500 GB logs ingested; 200 custom metrics; 50 alarms; 5 dashboards
+Production,Monitoring,Audit trail,AWS CloudTrail,Management and data events,1,us-east-1,50 million data events per month
+Production,Monitoring,Config rules,AWS Config,Configuration items and rules,1,us-east-1,20000 configuration items; 30 rules
+Production,Monitoring,Tracing,AWS X-Ray,Traces,1,us-east-1,10 million traces recorded per month
+Production,Messaging,Transactional email,Amazon SES,Outbound email,1,us-east-1,2 million emails per month
+Production,Messaging,Contact center,Amazon Connect,Inbound voice,1,us-east-1,50000 minutes per month
+Production,DevOps,Build service,AWS CodeBuild,general1.medium Linux,1,us-east-1,3000 build minutes per month
+Production,DevOps,Pipelines,AWS CodePipeline,V1 pipelines,5,us-east-1,
+Production,Desktop,Virtual desktops,Amazon WorkSpaces,Standard bundle Windows monthly,25,us-east-1,Always-on monthly billing
+Production,Migration,Database migration,AWS Database Migration Service,dms.r5.large,1,us-east-1,Single-AZ; 100 GB storage; one month
+Production,Transfer,SFTP endpoint,AWS Transfer Family,SFTP server,1,us-east-1,Always on; 500 GB uploaded per month
+Disaster Recovery,App,DR app servers,Amazon EC2,c7g.xlarge Linux On-Demand,2,us-west-2,Always on; 100 GB gp3 each
+Disaster Recovery,Data,DR database,Amazon RDS for PostgreSQL,db.r6g.large Single-AZ,1,us-west-2,500 GB gp3 storage
+Disaster Recovery,Storage,DR replica bucket,Amazon S3,S3 Standard,1,us-west-2,5 TB stored
+Disaster Recovery,Data,Global table replica,Amazon DynamoDB,On-demand capacity,1,us-west-2,200 GB storage; 300 million replicated writes per month
+Europe,Web,EU web servers,Amazon EC2,m7g.large Linux On-Demand,2,eu-west-1,Always on; 50 GB gp3 each
+Europe,Data,EU database,Amazon RDS for PostgreSQL,db.r6g.large Multi-AZ,1,eu-west-1,250 GB gp3 storage
+Europe,Storage,EU assets,Amazon S3,S3 Standard,1,eu-west-1,2 TB stored
+Asia Pacific,Web,Mumbai web servers,Amazon EC2,t4g.medium Linux On-Demand,3,ap-south-1,Always on; 30 GB gp3 each
+Asia Pacific,Data,Mumbai database,Amazon RDS for MySQL,db.t4g.large Single-AZ,1,ap-south-1,200 GB gp3 storage
+Staging,App,Staging app servers,Amazon EC2,t4g.large Linux On-Demand,3,us-east-1,Run 12 hours a day on weekdays
+Staging,Data,Staging database,Amazon RDS for PostgreSQL,db.t4g.medium Single-AZ,1,us-east-1,100 GB gp3 storage
+Staging,Containers,Staging Fargate,AWS Fargate,ECS on Fargate Linux x86,4,us-east-1,4 tasks; 0.5 vCPU and 1 GB memory; 12 hours a day
+Development,App,Dev servers,Amazon EC2,t3.medium Linux On-Demand,5,us-east-1,Run 10 hours a day on weekdays
+Development,Data,Dev database,Amazon RDS for MySQL,db.t3.micro Single-AZ,2,us-east-1,20 GB gp2 storage
+Development,Desktop,Cloud IDE,Amazon EC2,t3.large Linux,4,us-east-1,

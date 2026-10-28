@@ -147,8 +147,21 @@ def field_from(node):
         cols = []
         for c in node.get("row") or []:
             key = c.get("selectorId") or "undefined"  # the calculator stores utilization under "undefined"
-            cols.append({"key": key, "label": clean(c.get("label") or key, 60), "type": c.get("type"),
-                         **({"dependsOn": c["dependent"]} if c.get("dependent") else {})})
+            label = clean(c.get("label") or key, 60)
+            export = str(c.get("exportValueAs") or "")
+            col = {"key": key, "label": label, "type": c.get("type")}
+            if c.get("dependent"):
+                col["dependsOn"] = c["dependent"]
+            if isinstance(c.get("defaultValue"), (str, int, float, dict)) and not isinstance(c.get("defaultValue"), bool):
+                # Shows the value format (MSK wants "m5.large") and is what the calculator's form starts with.
+                col["default"] = c["defaultValue"]
+            if export.lower().startswith("count") or label.lower().startswith(("number of", "quantity")):
+                col["count"] = True
+            if "family" in export.lower() or key in ("Instance Family", "Product Family"):
+                col["derived"] = True  # looked up from the instance type; a wrong guess prices the row at $0
+            elif key in (node.get("primaryKey") or {}):
+                col["lookup"] = True  # a column the price is looked up by (instance type, compute family...)
+            cols.append(col)
         f["columns"] = cols
     elif kind == "datatransfer":
         f["types"] = node.get("dataTransferTypes") or ["INBOUND", "OUTBOUND"]

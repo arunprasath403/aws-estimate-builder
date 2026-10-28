@@ -10,10 +10,24 @@ import re
 import catalog
 from regions import REGIONS
 
-UTIL_KEY = "undefined"  # the calculator stores instance-row utilization under this key
-# Instance-table columns we fill. Other lookup columns (e.g. ElastiCache "Instance Family") take values from AWS
-# price data; a wrong guess prices the row at $0, and leaving them out lets the calculator derive them.
-ROW_KEYS = catalog.ROW_KEYS
+UTIL_KEY = "undefined"  # most calculator tables store instance-row utilization under this key
+COUNT_WORDS = ("number of", "count", "quantity", "nodes", "instances", "brokers")
+INSTANCE_WORDS = ("instance", "compute", "node type", "family", "type", "name", "size")
+
+
+# Service prefixes the calculator's price lists leave out (checked against calculator.aws).
+UNPREFIXED = ("kafka.", "dms.")
+# Row values the model copies from a dropdown label but the price lists spell differently.
+VALUE_ALIASES = {"Cache Engine": {"memcache": "Memcached", "redis oss": "Redis"}}
+
+
+def _like_example(value: str, example) -> str:
+    """Drop a service prefix the calculator does not use: MSK lists brokers as "m5.large", not "kafka.m5.large"."""
+    if isinstance(example, str) and value.count(".") > example.count(".") >= 1:
+        return value.split(".", 1)[1]
+    if example is None and value.lower().startswith(UNPREFIXED):
+        return value.split(".", 1)[1]
+    return value
 
 
 def _num(v):
@@ -96,35 +110,66 @@ def _value(f, raw, notes):
         rows = raw.get("value") if isinstance(raw, dict) else raw
         if not isinstance(rows, list) or not rows:
             raise ValueError(f"{f['label'] or 'Instances'}: add at least one row")
-        cols = {c["key"] for c in f.get("columns", [])} & ROW_KEYS
+        cols = {c["key"]: c for c in catalog.row_columns(f)}
+        by_lower = {k.lower(): k for k in cols}
+        util = next((k for k, c in cols.items() if c.get("type") == "utilization"), None)
+        count = next((k for k, c in cols.items() if c.get("count")), None)
+        lookup = next((k for k, c in cols.items() if c.get("lookup") and any(w in k.lower() for w in INSTANCE_WORDS)),
+                      None)
         out = []
         for r in rows[:50]:
             if not isinstance(r, dict):
                 continue
             row = {}
             for k, v in r.items():
-                key = UTIL_KEY if k.lower() in ("utilization", UTIL_KEY) else k
-                if key not in cols:
+                kl = k.lower().strip()
+                if util and kl in ("utilization", UTIL_KEY, util.lower()):
+                    key = util
+                elif kl in by_lower:
+                    key = by_lower[kl]
+                elif count and any(w in kl for w in COUNT_WORDS):
+                    key = count  # e.g. "Number of Nodes" written for MSK's "Number of Kafka broker nodes"
+                elif lookup and lookup not in r and any(w in kl for w in INSTANCE_WORDS):
+                    key = lookup  # e.g. "Instance Type" written for MSK's "Compute Family"
+                else:
                     continue
                 v = _scalar(v)
-                if key == UTIL_KEY:
+                if key == util:
                     if isinstance(v, dict):
                         v = v.get("unit")
-                    if v in (None, ""):
-                        continue
+                    default = cols[util].get("default")
+                    custom = isinstance(default, dict) and default.get("selectedId") != "%Utilized/Month"
+                    if v in (None, "") or custom:
+                        continue  # e.g. WorkSpaces "Billing option": keep the calculator's Monthly/Hourly default
                     row[key] = {"value": {"unit": _fmt(_num(v)), "selectedId": "%Utilized/Month"}}
-                elif v not in (None, ""):
-                    row[key] = {"value": str(v).strip()}
+                elif v in (None, ""):
+                    continue
+                elif key == count:
+                    row[key] = {"value": _fmt(_num(v))}
+                elif cols[key].get("lookup"):
+                    row[key] = {"value": _like_example(str(v).strip(), cols[key].get("default"))}
+                else:
+                    v = str(v).strip()
+                    row[key] = {"value": VALUE_ALIASES.get(key, {}).get(v.lower(), v)}
+            if not row:
+                continue  # nothing from the document in this row
+            if "Instance Type" in cols and "Instance Type" not in row:
+                raise ValueError("Each row needs 'Instance Type'")
             if "TermType" in cols and "TermType" not in row:
                 row["TermType"] = {"value": "OnDemand"}
-            if UTIL_KEY in cols and UTIL_KEY not in row:
-                row[UTIL_KEY] = {"value": {"unit": "100", "selectedId": "%Utilized/Month"}}
-            for need in ("Number of Nodes", "Instance Type"):
-                if need in cols and need not in row:
-                    raise ValueError(f"Each row needs '{need}'")
+            # Start the rest of the row the way the calculator's form does: from each column's default. Family
+            # lookups without a default stay out (the calculator derives them from the instance type).
+            for c in f.get("columns") or []:
+                k, d = c["key"], c.get("default")
+                if k in row or c.get("count") or d in (None, ""):
+                    continue
+                if c.get("type") == "utilization" or not isinstance(d, dict):
+                    row[k] = {"value": d}
+            if util and util not in row:
+                row[util] = {"value": {"unit": "100", "selectedId": "%Utilized/Month"}}
             out.append(row)
         if not out:
-            raise ValueError("No valid instance rows")
+            raise ValueError(f"{f['label'] or 'Instances'}: add at least one row")
         return {"value": out}
     if kind == "datatransfer":
         rows = raw.get("value") if isinstance(raw, dict) else raw
@@ -153,6 +198,25 @@ def _value(f, raw, notes):
 
 HOURS = {"sec": 1 / 3600, "min": 1 / 60, "hr": 1, "hours": 1, "day": 24, "week": 168, "month": 730}
 SHORT_PERIODS = {"perSecond", "perMinute", "perHour", "perDay", "perWeek"}
+
+
+def _unseen_instances(fields, values, source, notes):
+    """Flag instance names that are not in the document: the model sometimes mistypes them (m7b for m7g), and an
+    unknown name prices the row at $0 without any other sign."""
+    if not source:
+        return
+    text = source.lower()
+    for fid, v in values.items():
+        f = fields.get(fid)
+        if not f or f["kind"] != "instances":
+            continue
+        for c in catalog.row_columns(f):
+            if not (c.get("lookup") and any(w in c["key"].lower() for w in INSTANCE_WORDS)):
+                continue
+            for r in v["value"]:
+                name = str((r.get(c["key"]) or {}).get("value") or "")
+                if "." in name and name.lower() not in text:
+                    notes.append(f"{c['label']} '{name}' is not in your file. Check it before pricing.")
 
 
 def _always_on_counts(fields, values, notes):
@@ -212,15 +276,24 @@ def normalize(raw: dict) -> dict:
             bad.append(fid)
             it["errors"].append(str(e) or f"{f['label']}: invalid value")
     _always_on_counts(fields, values, it["warnings"])
+    _unseen_instances(fields, values, " ".join(str(it.get(k) or "") for k in ("original_text", "details")),
+                      it["warnings"])
 
-    # Optional add-ons asked as yes/no ("Would you be creating an RDS Proxy...?") default to Yes in the
-    # calculator and add cost; leave them off unless the user turns them on.
+    # Optional add-ons default to on in the calculator and add cost: yes/no questions ("Would you be creating an
+    # RDS Proxy...?") and on/off features ("Advanced security features: Enabled"). Leave them off unless the
+    # document or the user turns them on. Toggles that describe usage ("Registered via ECS") are left alone.
     for fid, f in fields.items():
         if fid in values or f["kind"] != "dropdown" or f.get("conditional"):
             continue
-        no = next((o["id"] for o in f["options"] if o["label"].strip().lower() == "no"), None)
-        if no is not None and re.match(r"(would|do|will|are|is|does)\b", f["label"].strip().lower()):
-            values[fid] = {"value": no}
+        label = f["label"].strip().lower()
+        by_label = {o["label"].strip().lower(): o["id"] for o in f["options"]}
+        off = next((by_label[w] for w in ("no", "disabled", "disable", "off") if w in by_label), None)
+        if off is None:
+            continue
+        default_on = str(f.get("default")) in {str(by_label.get(w)) for w in ("yes", "enabled", "enable", "on")}
+        if re.match(r"(would|do|will|are|is|does)\b", label) or (
+                default_on and not re.search(r"registered|free tier|included", label)):
+            values[fid] = {"value": off}
     it["values"] = values
 
     # Questions: what the AI flagged as price-relevant, invalid values, and the core inputs without which the

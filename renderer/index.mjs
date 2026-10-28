@@ -91,11 +91,19 @@ async function priceInTab(browser, estimate, timeoutMs) {
       await new Promise((r) => setTimeout(r, 750));
       snap = await page.evaluate((k) => {
         const rows = [...document.querySelectorAll("tr")].filter((r) => /USD/.test(r.innerText)).length;
-        return { rows, raw: sessionStorage.getItem(k) || "" };
+        const raw = sessionStorage.getItem(k) || "";
+        // The calculator writes each service's configSummary when it prices it (we send them empty).
+        let summarized = 0;
+        try { summarized = Object.values(JSON.parse(raw).estimate.services || {}).filter((s) => s.configSummary).length; } catch {}
+        return { rows, summarized, raw };
       }, KEY);
-      if (snap.rows >= n && snap.raw === last) {
+      if (snap.raw === last) {
         if (!stableSince) stableSince = Date.now();
-        if (Date.now() - stableSince > 2500) break; // no change for 2.5 s: recalculation finished
+        const quiet = Date.now() - stableSince;
+        // Done when every service is priced and nothing changed for 2.5 s. The table can paginate and free
+        // services may never show a summary, so also accept 10 s with no change once pricing has started.
+        if ((snap.rows >= n || snap.summarized >= n) && quiet > 2500) break;
+        if ((snap.rows > 0 || snap.summarized > 0) && quiet > 10000) break;
       } else {
         stableSince = 0;
         last = snap.raw;

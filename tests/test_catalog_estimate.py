@@ -50,3 +50,10 @@ def test_ec2_builder():
     assert cc["instanceType"]["value"] == "t4g.nano"
     assert cc["workload"]["value"]["data"] == "2"
     assert cc["pricingStrategy"]["value"]["utilizationValue"] == "50"
+
+
+def test_resolve_abbreviations_and_backup_parts():
+    assert catalog.resolve("Amazon MSK") == "amazonManagedStreamingForApacheKafkaMsk"
+    assert catalog.resolve("Amazon EBS") == "amazonElasticBlockStore"  # not AWS Backup's "EBS" part
+    assert catalog.resolve("EBS Backup") == "amazonEbsBackup"
+    assert catalog.resolve("Amazon S3") is None  # ambiguous: the user picks the storage class

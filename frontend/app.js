@@ -54,9 +54,18 @@ async function api(method, path, body) {
 async function runJob(body, onTick) {
   const { job_id } = await api("POST", "/jobs", body);
   const t0 = Date.now();
+  let misses = 0;
   for (;;) {
     await new Promise((r) => setTimeout(r, 3000));
-    const st = await api("GET", "/jobs/" + job_id);
+    let st;
+    try {
+      st = await api("GET", "/jobs/" + job_id);
+      misses = 0;
+    } catch (e) {
+      // A dropped status check should not lose a job that is still running; give up after several in a row.
+      if (++misses >= 5) throw e;
+      continue;
+    }
     if (st.status === "done") return st.result;
     if (st.status === "error") throw new Error(st.error || "The job failed.");
     if (Date.now() - t0 > 5 * 60 * 1000) throw new Error("This is taking too long. Please try again.");
@@ -66,8 +75,24 @@ async function runJob(body, onTick) {
 
 async function schemaFor(code) {
   if (!code) return null;
-  if (!schemas[code]) schemas[code] = await api("GET", "/services/" + encodeURIComponent(code));
+  for (let attempt = 1; !schemas[code]; attempt++) {
+    try {
+      schemas[code] = await api("GET", "/services/" + encodeURIComponent(code));
+    } catch (e) {
+      // Throttled responses reach the browser as network errors; back off and retry a few times.
+      if (attempt >= 4) throw e;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
   return schemas[code];
+}
+
+// Large files reference dozens of services; fetch their forms a few at a time to stay under the API rate limit.
+async function loadSchemas(codes, parallel = 6) {
+  const queue = [...codes];
+  await Promise.all(Array.from({ length: parallel }, async () => {
+    while (queue.length) await schemaFor(queue.shift());
+  }));
 }
 
 async function loadServices() {
@@ -103,12 +128,14 @@ async function handleFile(file) {
     }
     items = res.items;
     nextId = items.length + 1;
-    await Promise.all([...new Set(items.map((i) => i.service).filter(Boolean))].map(schemaFor));
+    await loadSchemas([...new Set(items.map((i) => i.service).filter(Boolean))]);
     $("estName").value = file.name.replace(/\.[^.]+$/, "");
     $("total").textContent = "";
     render();
     $("review").classList.remove("hidden");
-    setStatus($("status"), `<span class="muted">Found ${items.length} item(s) in <b>${esc(file.name)}</b>.</span>`);
+    const free = (res.not_priced || []).map((n) => esc(n.name)).join(", ");
+    setStatus($("status"), `<span class="muted">Found ${items.length} item(s) in <b>${esc(file.name)}</b>.${
+      free ? ` Not priced (no AWS charge): ${free}.` : ""}</span>`);
   } catch (e) {
     setStatus($("status"), e.message, true);
   } finally {
@@ -175,16 +202,30 @@ function fieldHtml(it, f, isQ) {
   return `<label class="f${isQ ? " q" : ""}" title="${esc(f.help || "")}"><span class="lbl"><span>${esc(f.label)}</span>${skipBtn(it, f, isQ)}</span>${input}</label>`;
 }
 
+// Family columns are looked up from the instance type by the calculator, so they are not edited here.
+const rowColumns = (f) => (f.columns || []).filter((c) => !c.derived);
+
+function newRow(f) {
+  const row = {};
+  for (const c of rowColumns(f)) {
+    if (c.count) row[c.key] = { value: "1" };
+    else if (c.type === "utilization") row[c.key] = { value: { unit: "100", selectedId: "%Utilized/Month" } };
+    else if (c.key === "TermType") row[c.key] = { value: "OnDemand" };
+  }
+  return row;
+}
+
 function instancesHtml(it, f, isQ) {
   const rows = ((it.values || {})[f.id] || {}).value || [];
-  const cols = (f.columns || []).filter((c) => ["Number of Nodes", "Instance Type", "undefined", "TermType", "Deployment Option"].includes(c.key));
+  const cols = rowColumns(f);
   const cell = (r, i, c) => {
     const raw = r[c.key] ? r[c.key].value : "";
-    const val = c.key === "undefined" ? (raw && raw.unit) || "" : raw;
-    const ph = { "Number of Nodes": "1", "Instance Type": "e.g. db.r6g.large", undefined: "100", TermType: "OnDemand", "Deployment Option": "Single-AZ" }[c.key] || "";
-    return `<td><input data-id="${it.id}" data-f="${esc(f.id)}" data-row="${i}" data-col="${esc(c.key)}" value="${esc(val)}" placeholder="${esc(ph)}"></td>`;
+    const util = c.type === "utilization";
+    const val = util ? (raw && raw.unit) || "" : raw;
+    const ph = util ? "100" : c.count ? "1" : c.key === "TermType" ? "OnDemand" : c.default ? `e.g. ${c.default}` : "";
+    return `<td><input data-id="${it.id}" data-f="${esc(f.id)}" data-row="${i}" data-col="${esc(c.key)}"${util ? ' data-util="1"' : ""} value="${esc(val)}" placeholder="${esc(ph)}"></td>`;
   };
-  const head = cols.map((c) => `<th>${esc(c.key === "undefined" ? "Utilization %" : c.label)}</th>`).join("");
+  const head = cols.map((c) => `<th>${esc(c.type === "utilization" ? "Utilization %" : c.label)}</th>`).join("");
   const body = rows.map((r, i) => `<tr>${cols.map((c) => cell(r, i, c)).join("")}<td><button class="link" data-delrow="${i}" data-id="${it.id}" data-f="${esc(f.id)}">Remove</button></td></tr>`).join("");
   return `<div class="f wide${isQ ? " q" : ""}"><span class="lbl"><span>${esc(f.label)}</span>${skipBtn(it, f, isQ)}</span>
     <table class="rows"><tr>${head}<th></th></tr>${body}</table>
@@ -288,7 +329,7 @@ document.addEventListener("change", async (e) => {
   else if (kind === "template") { it.template = el.value; it.values = {}; }
   else if (el.dataset.row !== undefined) {
     const rows = it.values[fid].value; const r = rows[+el.dataset.row]; const col = el.dataset.col;
-    if (col === "undefined") r[col] = { value: { unit: el.value || "100", selectedId: "%Utilized/Month" } };
+    if (el.dataset.util) r[col] = { value: { unit: el.value || "100", selectedId: "%Utilized/Month" } };
     else if (el.value === "") delete r[col]; else r[col] = { value: el.value };
   } else if (el.dataset.dt !== undefined) {
     const r = it.values[fid].value[+el.dataset.dt];
@@ -321,7 +362,7 @@ document.addEventListener("click", (e) => {
   else if (el.dataset.addrow) {
     it.values = it.values || {};
     const rows = (it.values[fid] = it.values[fid] || { value: [] }).value;
-    rows.push({ "Number of Nodes": { value: "1" }, TermType: { value: "OnDemand" }, undefined: { value: { unit: "100", selectedId: "%Utilized/Month" } } });
+    rows.push(newRow(templateOf(it).fields.find((x) => x.id === fid) || {}));
   } else if (el.dataset.delrow !== undefined) {
     it.values[fid].value.splice(+el.dataset.delrow, 1);
     if (!it.values[fid].value.length) delete it.values[fid];
